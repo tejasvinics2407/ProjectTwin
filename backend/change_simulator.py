@@ -1,7 +1,9 @@
 from backend.impact_analyzer import find_impact
+from backend.dependency_impact import analyze_dependency_impact
 
 
 def classify_change(change_description):
+
     """
     Classify the proposed software change.
     """
@@ -47,6 +49,7 @@ def classify_change(change_description):
 
 
 def find_direct_dependencies(graph, changed_file):
+
     """
     Find files that directly depend on the changed file.
     """
@@ -56,12 +59,21 @@ def find_direct_dependencies(graph, changed_file):
     for source, target in graph.edges():
 
         if target == changed_file:
-            direct_dependencies.append(source)
 
-    return sorted(set(direct_dependencies))
+            direct_dependencies.append(
+                source
+            )
+
+    return sorted(
+        set(direct_dependencies)
+    )
 
 
-def find_indirect_dependencies(graph, changed_file):
+def find_indirect_dependencies(
+    graph,
+    changed_file
+):
+
     """
     Find files indirectly affected by a whole-file change.
     """
@@ -77,12 +89,16 @@ def find_indirect_dependencies(graph, changed_file):
         find_impact(
             graph,
             changed_file
-        )["affected_files"]
+        )[
+            "affected_files"
+        ]
     )
 
     indirect = all_affected - direct
 
-    return sorted(indirect)
+    return sorted(
+        indirect
+    )
 
 
 def find_function_impact(
@@ -90,8 +106,10 @@ def find_function_impact(
     changed_file,
     changed_function
 ):
+
     """
-    Find exact functions that depend on the changed function.
+    Find exact functions that depend on
+    the changed function.
     """
 
     function_impact = []
@@ -150,7 +168,10 @@ def find_function_impact(
     return function_impact
 
 
-def find_function_affected_files(function_impact):
+def find_function_affected_files(
+    function_impact
+):
+
     """
     Convert function relationships into affected files.
     """
@@ -164,23 +185,33 @@ def find_function_affected_files(function_impact):
         )
 
         if dependent_file:
+
             affected_files.add(
                 dependent_file
             )
 
-    return sorted(affected_files)
+    return sorted(
+        affected_files
+    )
 
 
-def find_test_impact(graph, changed_file):
+def find_test_impact(
+    graph,
+    changed_file
+):
+
     """
-    Find test files that directly depend on the changed file.
+    Find test files that directly depend
+    on the changed file.
     """
 
     test_files = []
 
-    direct_dependencies = find_direct_dependencies(
-        graph,
-        changed_file
+    direct_dependencies = (
+        find_direct_dependencies(
+            graph,
+            changed_file
+        )
     )
 
     for file in direct_dependencies:
@@ -197,16 +228,22 @@ def find_test_impact(graph, changed_file):
             or "/test_" in normalized
         ):
 
-            test_files.append(file)
+            test_files.append(
+                file
+            )
 
     return sorted(
         set(test_files)
     )
 
 
-def build_function_breakage(function_impact):
+def build_function_breakage(
+    function_impact
+):
+
     """
-    Create evidence-based explanations for function dependencies.
+    Create evidence-based explanations
+    for function dependencies.
     """
 
     possible_breakage = []
@@ -244,10 +281,6 @@ def build_function_breakage(function_impact):
             f"{changed_file}"
         )
 
-        # -----------------------------------------------------
-        # Add data-flow evidence when available
-        # -----------------------------------------------------
-
         if assigned_to:
 
             reason += (
@@ -264,9 +297,7 @@ def build_function_breakage(function_impact):
         possible_breakage.append(
             {
                 "file": dependent_file,
-
                 "function": dependent_function,
-
                 "reason": reason
             }
         )
@@ -279,9 +310,10 @@ def build_consequence_analysis(
     change_type,
     change_description
 ):
+
     """
-    Generate structured consequence predictions from
-    the dependency and data-flow evidence.
+    Generate structured consequence predictions
+    from dependency and data-flow evidence.
 
     These are predictions, not guarantees.
     """
@@ -305,10 +337,6 @@ def build_consequence_analysis(
         assigned_to = relationship.get(
             "assigned_to"
         )
-
-        # -----------------------------------------------------
-        # MODIFY
-        # -----------------------------------------------------
 
         if change_type == "MODIFY":
 
@@ -355,10 +383,6 @@ def build_consequence_analysis(
                     }
                 )
 
-        # -----------------------------------------------------
-        # REMOVE
-        # -----------------------------------------------------
-
         elif change_type == "REMOVE":
 
             consequences.append(
@@ -379,10 +403,6 @@ def build_consequence_analysis(
                     )
                 }
             )
-
-        # -----------------------------------------------------
-        # ADD
-        # -----------------------------------------------------
 
         elif change_type == "ADD":
 
@@ -413,14 +433,18 @@ def predict_change(
     changed_file,
     change_description,
     function_dependencies=None,
-    changed_function=None
+    changed_function=None,
+    dependency_model=None
 ):
+
     """
     Predict consequences of a proposed software change.
 
-    Function-level changes use exact function dependencies.
+    Function-level changes can use the new
+    language-independent DependencyModel.
 
-    Whole-file changes use the file dependency graph.
+    The existing Python dependency logic is retained
+    as a fallback for compatibility.
     """
 
     if function_dependencies is None:
@@ -431,37 +455,145 @@ def predict_change(
     )
 
     # =========================================================
+    # LANGUAGE-INDEPENDENT IMPACT
+    # =========================================================
+
+    dependency_impact = None
+
+    if dependency_model is not None:
+
+        dependency_impact = (
+            analyze_dependency_impact(
+                dependency_model,
+                changed_file,
+                changed_function
+            )
+        )
+
+    # =========================================================
     # FUNCTION-LEVEL SIMULATION
     # =========================================================
 
     if changed_function:
 
-        function_impact = find_function_impact(
-            function_dependencies,
-            changed_file,
-            changed_function
-        )
+        # -----------------------------------------------------
+        # New language-independent engine
+        # -----------------------------------------------------
 
-        affected_files = find_function_affected_files(
-            function_impact
-        )
+        if dependency_impact is not None:
 
-        direct_dependencies = affected_files
+            direct_relationships = (
+                dependency_impact[
+                    "direct_impact"
+                ]
+            )
+
+            function_impact = []
+
+            for relationship in (
+                direct_relationships
+            ):
+
+                if (
+                    relationship[
+                        "relationship_type"
+                    ]
+                    != "calls"
+                ):
+                    continue
+
+                function_impact.append(
+                    {
+                        "changed_file": (
+                            relationship[
+                                "target_file"
+                            ]
+                        ),
+
+                        "changed_function": (
+                            relationship[
+                                "target_symbol"
+                            ]
+                        ),
+
+                        "dependent_file": (
+                            relationship[
+                                "source_file"
+                            ]
+                        ),
+
+                        "dependent_function": (
+                            relationship[
+                                "source_symbol"
+                            ]
+                        ),
+
+                        "assigned_to": None,
+
+                        "call_line": None
+                    }
+                )
+
+            affected_files = (
+                dependency_impact[
+                    "affected_files"
+                ]
+            )
+
+            direct_dependencies = sorted(
+                set(
+                    relationship[
+                        "source_file"
+                    ]
+                    for relationship
+                    in direct_relationships
+                )
+            )
+
+            indirect_dependencies = (
+                dependency_impact[
+                    "indirect_impact"
+                ]
+            )
+
+        # -----------------------------------------------------
+        # Existing Python fallback
+        # -----------------------------------------------------
+
+        else:
+
+            function_impact = (
+                find_function_impact(
+                    function_dependencies,
+                    changed_file,
+                    changed_function
+                )
+            )
+
+            affected_files = (
+                find_function_affected_files(
+                    function_impact
+                )
+            )
+
+            direct_dependencies = (
+                affected_files
+            )
+
+            indirect_dependencies = []
+
+        # -----------------------------------------------------
+        # Existing test analysis
+        # -----------------------------------------------------
 
         test_files = find_test_impact(
             graph,
             changed_file
         )
 
-        indirect_dependencies = []
-
         removed = []
         modified = []
         added = []
-
-        # -----------------------------------------------------
-        # MODIFY
-        # -----------------------------------------------------
 
         if change_type == "MODIFY":
 
@@ -473,10 +605,6 @@ def predict_change(
                 affected_files
             )
 
-        # -----------------------------------------------------
-        # REMOVE
-        # -----------------------------------------------------
-
         elif change_type == "REMOVE":
 
             modified.append(
@@ -487,18 +615,16 @@ def predict_change(
                 affected_files
             )
 
-        # -----------------------------------------------------
-        # ADD
-        # -----------------------------------------------------
-
         elif change_type == "ADD":
 
             modified.append(
                 changed_file
             )
 
-        possible_breakage = build_function_breakage(
-            function_impact
+        possible_breakage = (
+            build_function_breakage(
+                function_impact
+            )
         )
 
         # -----------------------------------------------------
@@ -523,10 +649,12 @@ def predict_change(
         # Consequence analysis
         # -----------------------------------------------------
 
-        consequences = build_consequence_analysis(
-            function_impact,
-            change_type,
-            change_description
+        consequences = (
+            build_consequence_analysis(
+                function_impact,
+                change_type,
+                change_description
+            )
         )
 
         return {
@@ -545,9 +673,13 @@ def predict_change(
 
             "affected_files": affected_files,
 
-            "direct_dependencies": direct_dependencies,
+            "direct_dependencies": (
+                direct_dependencies
+            ),
 
-            "indirect_dependencies": indirect_dependencies,
+            "indirect_dependencies": (
+                indirect_dependencies
+            ),
 
             "function_impact": function_impact,
 
@@ -567,31 +699,77 @@ def predict_change(
                 set(added)
             ),
 
-            "possible_breakage": possible_breakage
+            "possible_breakage": possible_breakage,
+
+            "dependency_engine": (
+                "language-independent"
+                if dependency_model is not None
+                else "python-legacy"
+            )
         }
 
     # =========================================================
     # WHOLE-FILE SIMULATION
     # =========================================================
 
-    impact = find_impact(
-        graph,
-        changed_file
-    )
+    if dependency_impact is not None:
 
-    affected_files = impact[
-        "affected_files"
-    ]
+        affected_files = (
+            dependency_impact[
+                "affected_files"
+            ]
+        )
 
-    direct_dependencies = find_direct_dependencies(
-        graph,
-        changed_file
-    )
+        direct_dependencies = []
 
-    indirect_dependencies = find_indirect_dependencies(
-        graph,
-        changed_file
-    )
+        for relationship in (
+            dependency_impact[
+                "direct_impact"
+            ]
+        ):
+
+            source_file = (
+                relationship[
+                    "source_file"
+                ]
+            )
+
+            if source_file not in direct_dependencies:
+
+                direct_dependencies.append(
+                    source_file
+                )
+
+        indirect_dependencies = (
+            dependency_impact[
+                "indirect_impact"
+            ]
+        )
+
+    else:
+
+        impact = find_impact(
+            graph,
+            changed_file
+        )
+
+        affected_files = impact[
+            "affected_files"
+        ]
+
+        direct_dependencies = (
+            find_direct_dependencies(
+                graph,
+                changed_file
+            )
+        )
+
+        indirect_dependencies = (
+            find_indirect_dependencies(
+                graph,
+                changed_file
+            )
+        )
 
     test_files = find_test_impact(
         graph,
@@ -603,7 +781,9 @@ def predict_change(
     consequences = []
 
     removed = []
+
     modified = []
+
     added = []
 
     possible_breakage = []
@@ -714,9 +894,13 @@ def predict_change(
 
         "affected_files": affected_files,
 
-        "direct_dependencies": direct_dependencies,
+        "direct_dependencies": (
+            direct_dependencies
+        ),
 
-        "indirect_dependencies": indirect_dependencies,
+        "indirect_dependencies": (
+            indirect_dependencies
+        ),
 
         "function_impact": function_impact,
 
@@ -736,5 +920,11 @@ def predict_change(
             set(added)
         ),
 
-        "possible_breakage": possible_breakage
+        "possible_breakage": possible_breakage,
+
+        "dependency_engine": (
+            "language-independent"
+            if dependency_model is not None
+            else "python-legacy"
+        )
     }

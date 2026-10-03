@@ -4,10 +4,13 @@ from backend.project_scanner import scan_project
 from backend.github_ingestion import clone_repository
 
 from backend.code_parser import parse_python_file
-
 from backend.parser_manager import parse_file
 
 from backend.project_model import ProjectModel
+
+from backend.dependency_extractor import (
+    build_dependency_model
+)
 
 from backend.dependency_analyzer import (
     build_dependencies,
@@ -20,6 +23,7 @@ from backend.dependency_graph import (
 )
 
 from backend.knowledge_base import save_knowledge_base
+
 from backend.change_simulator import predict_change
 
 
@@ -65,10 +69,6 @@ def analyze_project(project_path):
 
     for file_path in files:
 
-        # -------------------------------------------------
-        # Detect language + select parser automatically
-        # -------------------------------------------------
-
         full_path = (
             project_root / file_path
         )
@@ -87,7 +87,6 @@ def analyze_project(project_path):
             # -------------------------------------------------
 
             if project_file is None:
-
                 continue
 
             # -------------------------------------------------
@@ -185,6 +184,52 @@ def analyze_project(project_path):
     )
 
     # =====================================================
+    # LANGUAGE-INDEPENDENT DEPENDENCY MODEL
+    # =====================================================
+
+    dependency_model = (
+        build_dependency_model(
+            project_model
+        )
+    )
+
+    print(
+        "\n=== Language-Independent "
+        "Dependencies ==="
+    )
+
+    print(
+        f"  Total dependencies: "
+        f"{dependency_model.summary()['dependency_count']}"
+    )
+
+    for dependency in (
+        dependency_model.get_all()
+    ):
+
+        source_symbol = (
+            dependency.source_symbol
+            if dependency.source_symbol
+            else "[file]"
+        )
+
+        target_symbol = (
+            dependency.target_symbol
+            if dependency.target_symbol
+            else "[file]"
+        )
+
+        print(
+            f"  {dependency.source_file}:"
+            f"{source_symbol}"
+            f" ---> "
+            f"{dependency.target_file}:"
+            f"{target_symbol}"
+            f" "
+            f"[{dependency.relationship_type}]"
+        )
+
+    # =====================================================
     # SAVE EXISTING KNOWLEDGE BASE
     # =====================================================
 
@@ -194,7 +239,7 @@ def analyze_project(project_path):
     )
 
     # =====================================================
-    # BUILD EXISTING PYTHON FILE DEPENDENCIES
+    # EXISTING PYTHON FILE DEPENDENCIES
     # =====================================================
 
     dependencies = build_dependencies(
@@ -203,7 +248,7 @@ def analyze_project(project_path):
     )
 
     print(
-        "\n=== Dependency Relationships ==="
+        "\n=== Python File Dependencies ==="
     )
 
     if dependencies:
@@ -237,7 +282,7 @@ def analyze_project(project_path):
         )
 
     # =====================================================
-    # BUILD EXISTING PYTHON FUNCTION DEPENDENCIES
+    # EXISTING PYTHON FUNCTION DEPENDENCIES
     # =====================================================
 
     function_dependencies = (
@@ -248,7 +293,7 @@ def analyze_project(project_path):
     )
 
     print(
-        "\n=== Function Dependencies ==="
+        "\n=== Python Function Dependencies ==="
     )
 
     if function_dependencies:
@@ -267,16 +312,18 @@ def analyze_project(project_path):
     else:
 
         print(
-            "  No Python function dependencies found."
+            "  No Python function "
+            "dependencies found."
         )
 
     # =====================================================
-    # RETURN EXISTING FORMAT
+    # RETURN
     # =====================================================
 
     return (
         graph,
-        function_dependencies
+        function_dependencies,
+        dependency_model
     )
 
 
@@ -303,10 +350,12 @@ if __name__ == "__main__":
     # ANALYZE PROJECT
     # =====================================================
 
-    graph, function_dependencies = (
-        analyze_project(
-            destination
-        )
+    (
+        graph,
+        function_dependencies,
+        dependency_model
+    ) = analyze_project(
+        destination
     )
 
     # =====================================================

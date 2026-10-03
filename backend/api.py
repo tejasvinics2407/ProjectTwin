@@ -166,6 +166,51 @@ def normalize_function_dependencies(
 
 
 # =========================================================
+# LANGUAGE-INDEPENDENT DEPENDENCY NORMALIZATION
+# =========================================================
+
+def normalize_dependency_model(
+    dependency_model,
+    repository_path
+):
+    """
+    Convert the language-independent DependencyModel
+    into JSON-friendly dictionaries with project-relative
+    file paths.
+    """
+
+    normalized = []
+
+    for dependency in dependency_model.get_all():
+
+        normalized.append(
+            {
+                "source_file": normalize_path(
+                    dependency.source_file,
+                    repository_path
+                ),
+
+                "source_symbol": dependency.source_symbol,
+
+                "target_file": normalize_path(
+                    dependency.target_file,
+                    repository_path
+                ),
+
+                "target_symbol": dependency.target_symbol,
+
+                "relationship_type": (
+                    dependency.relationship_type
+                ),
+
+                "evidence": dependency.evidence,
+            }
+        )
+
+    return normalized
+
+
+# =========================================================
 # HOME
 # =========================================================
 
@@ -197,11 +242,13 @@ def simulate_change(request: SimulationRequest):
         base_destination
     )
 
+    # -----------------------------------------------------
     # IMPORTANT:
     # clone_repository() may return a NEW destination
     # when another repository already exists there.
     #
     # We MUST analyze the returned destination.
+    # -----------------------------------------------------
 
     repository_path = Path(repository_path)
 
@@ -209,7 +256,11 @@ def simulate_change(request: SimulationRequest):
     # Analyze repository
     # -----------------------------------------------------
 
-    graph, function_dependencies = analyze_project(
+    (
+        graph,
+        function_dependencies,
+        dependency_model
+    ) = analyze_project(
         str(repository_path)
     )
 
@@ -222,9 +273,24 @@ def simulate_change(request: SimulationRequest):
         repository_path
     )
 
+    # -----------------------------------------------------
+    # Normalize function dependencies
+    # -----------------------------------------------------
+
     function_dependencies = (
         normalize_function_dependencies(
             function_dependencies,
+            repository_path
+        )
+    )
+
+    # -----------------------------------------------------
+    # Normalize language-independent dependencies
+    # -----------------------------------------------------
+
+    dependency_model_data = (
+        normalize_dependency_model(
+            dependency_model,
             repository_path
         )
     )
@@ -263,7 +329,8 @@ def simulate_change(request: SimulationRequest):
         changed_file,
         request.change_description,
         function_dependencies,
-        changed_function
+        changed_function,
+        dependency_model
     )
 
     # -----------------------------------------------------
@@ -320,7 +387,14 @@ def simulate_change(request: SimulationRequest):
 
         "ai_analysis": ai_analysis,
 
-        "formatted_report": formatted_report
+        "formatted_report": formatted_report,
+
+        "dependency_model": {
+            "dependency_count": len(
+                dependency_model_data
+            ),
+            "dependencies": dependency_model_data
+        }
     }
 
 
@@ -344,9 +418,11 @@ def get_graph(request: GraphRequest):
         base_destination
     )
 
+    # -----------------------------------------------------
     # IMPORTANT:
     # Use the destination actually returned by
     # clone_repository().
+    # -----------------------------------------------------
 
     repository_path = Path(repository_path)
 
@@ -354,7 +430,11 @@ def get_graph(request: GraphRequest):
     # Analyze repository
     # -----------------------------------------------------
 
-    graph, function_dependencies = analyze_project(
+    (
+        graph,
+        function_dependencies,
+        dependency_model
+    ) = analyze_project(
         str(repository_path)
     )
 
@@ -365,6 +445,17 @@ def get_graph(request: GraphRequest):
     graph = normalize_graph(
         graph,
         repository_path
+    )
+
+    # -----------------------------------------------------
+    # Normalize language-independent dependencies
+    # -----------------------------------------------------
+
+    dependency_model_data = (
+        normalize_dependency_model(
+            dependency_model,
+            repository_path
+        )
     )
 
     # -----------------------------------------------------
@@ -415,5 +506,12 @@ def get_graph(request: GraphRequest):
 
         "nodes": nodes,
 
-        "edges": edges
+        "edges": edges,
+
+        "dependency_model": {
+            "dependency_count": len(
+                dependency_model_data
+            ),
+            "dependencies": dependency_model_data
+        }
     }
