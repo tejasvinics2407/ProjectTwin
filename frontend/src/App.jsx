@@ -592,6 +592,470 @@ function ImpactList({ title, items, empty }) {
     </div>
   );
 }
+function ImpactEvidence({ dependencyImpact }) {
+  if (!dependencyImpact) {
+    return null;
+  }
+
+  const direct = dependencyImpact.direct_impact || [];
+  const indirect = dependencyImpact.indirect_impact_details || [];
+  const confidence = dependencyImpact.confidence || {};
+
+  return (
+    <section style={styles.subsection}>
+      <h3 style={styles.sectionTitle}>
+        Impact Evidence
+      </h3>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "12px",
+          marginBottom: "16px",
+        }}
+      >
+        <div
+          style={{
+            padding: "12px",
+            borderRadius: "9px",
+            background: "#0b0c10",
+            border: "1px solid rgba(52, 211, 153, 0.2)",
+          }}
+        >
+          <div
+            style={{
+              color: "#6ee7b7",
+              fontSize: "9px",
+              fontWeight: 800,
+              letterSpacing: "1px",
+              marginBottom: "6px",
+            }}
+          >
+            DIRECT CONFIDENCE
+          </div>
+
+          <div
+            style={{
+              color: "#d1fae5",
+              fontSize: "13px",
+              fontWeight: 700,
+            }}
+          >
+            {confidence.direct || "PROVEN"}
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: "12px",
+            borderRadius: "9px",
+            background: "#0b0c10",
+            border: "1px solid rgba(167, 139, 250, 0.2)",
+          }}
+        >
+          <div
+            style={{
+              color: "#a78bfa",
+              fontSize: "9px",
+              fontWeight: 800,
+              letterSpacing: "1px",
+              marginBottom: "6px",
+            }}
+          >
+            INDIRECT CONFIDENCE
+          </div>
+
+          <div
+            style={{
+              color: "#ddd6fe",
+              fontSize: "13px",
+              fontWeight: 700,
+            }}
+          >
+            {confidence.indirect || "LIKELY"}
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          padding: "15px",
+          borderRadius: "10px",
+          background: "#0b0c10",
+          border: "1px solid #20222a",
+          marginBottom: "10px",
+        }}
+      >
+        <div
+          style={{
+            color: "#6ee7b7",
+            fontSize: "10px",
+            fontWeight: 800,
+            letterSpacing: "1px",
+            marginBottom: "10px",
+          }}
+        >
+          DIRECT IMPACT
+        </div>
+
+        {direct.length === 0 ? (
+          <div style={styles.muted}>
+            No direct impact detected.
+          </div>
+        ) : (
+          direct.map((item, index) => (
+            <div
+              key={index}
+              style={{
+                padding: "10px",
+                marginBottom: "7px",
+                borderRadius: "8px",
+                background: "#111218",
+              }}
+            >
+              <div
+                style={{
+                  color: "#e5e7eb",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                }}
+              >
+                {item.source_file}
+              </div>
+
+              {item.source_symbol && (
+                <div
+                  style={{
+                    color: "#a78bfa",
+                    fontSize: "11px",
+                    marginTop: "4px",
+                  }}
+                >
+                  {item.source_symbol}() →{" "}
+                  {item.target_symbol || dependencyImpact.changed_symbol || "changed component"}
+                </div>
+              )}
+
+              <div
+                style={{
+                  color: "#777b89",
+                  fontSize: "10px",
+                  marginTop: "5px",
+                }}
+              >
+                {item.evidence || "Dependency relationship detected."}
+              </div>
+
+              <div
+                style={{
+                  color: "#6ee7b7",
+                  fontSize: "9px",
+                  fontWeight: 800,
+                  marginTop: "6px",
+                }}
+              >
+                ✓ {item.confidence || "PROVEN"}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div
+        style={{
+          padding: "15px",
+          borderRadius: "10px",
+          background: "#0b0c10",
+          border: "1px solid #20222a",
+        }}
+      >
+        <div
+          style={{
+            color: "#a78bfa",
+            fontSize: "10px",
+            fontWeight: 800,
+            letterSpacing: "1px",
+            marginBottom: "10px",
+          }}
+        >
+          INDIRECT IMPACT
+        </div>
+
+        {indirect.length === 0 ? (
+          <div style={styles.muted}>
+            No indirect impact detected.
+          </div>
+        ) : (
+          indirect.map((item, index) => (
+            <div
+              key={index}
+              style={{
+                padding: "10px",
+                marginBottom: "7px",
+                borderRadius: "8px",
+                background: "#111218",
+              }}
+            >
+              <div
+                style={{
+                  color: "#e5e7eb",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                }}
+              >
+                {item.source_file}
+              </div>
+
+              <div
+                style={{
+                  color: "#777b89",
+                  fontSize: "10px",
+                  marginTop: "5px",
+                  lineHeight: 1.5,
+                }}
+              >
+                {item.evidence}
+              </div>
+
+              {item.dependency_chain && (
+                <div
+                  style={{
+                    color: "#8b8f9d",
+                    fontSize: "10px",
+                    marginTop: "6px",
+                  }}
+                >
+                  Chain:{" "}
+                  {item.dependency_chain.join(" → ")}
+                </div>
+              )}
+
+              <div
+                style={{
+                  color: "#c4b5fd",
+                  fontSize: "9px",
+                  fontWeight: 800,
+                  marginTop: "6px",
+                }}
+              >
+                {item.confidence || "LIKELY"}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ConsequencePrediction({ consequences }) {
+  if (!consequences || consequences.length === 0) {
+    return null;
+  }
+
+  return (
+    <section style={styles.subsection}>
+      <h3 style={styles.sectionTitle}>
+        Predicted Consequences
+      </h3>
+
+      <div
+        style={{
+          padding: "14px",
+          borderRadius: "10px",
+          background: "#0b0c10",
+          border: "1px solid #20222a",
+        }}
+      >
+        <div
+          style={{
+            color: "#fbbf24",
+            fontSize: "10px",
+            fontWeight: 800,
+            letterSpacing: "1px",
+            marginBottom: "12px",
+          }}
+        >
+          WHAT MAY HAPPEN IF THIS CHANGE IS APPLIED
+        </div>
+
+        {consequences.map((item, index) => (
+          <div
+            key={index}
+            style={{
+              padding: "12px",
+              marginBottom:
+                index === consequences.length - 1
+                  ? "0"
+                  : "8px",
+              borderRadius: "8px",
+              background: "#111218",
+              border: "1px solid #1d2028",
+            }}
+          >
+            {/* TYPE + SEVERITY */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "10px",
+                marginBottom: "7px",
+              }}
+            >
+              <div
+                style={{
+                  color: "#e5e7eb",
+                  fontSize: "12px",
+                  fontWeight: 800,
+                }}
+              >
+                {item.type || "CONSEQUENCE"}
+              </div>
+
+              <div
+                style={{
+                  color:
+                    item.severity === "HIGH"
+                      ? "#fca5a5"
+                      : "#fcd34d",
+                  fontSize: "9px",
+                  fontWeight: 800,
+                  letterSpacing: "0.8px",
+                }}
+              >
+                {item.severity || "POTENTIAL"}
+              </div>
+            </div>
+
+            {/* AFFECTED COMPONENT */}
+            <div
+              style={{
+                color: "#9ca3af",
+                fontSize: "10px",
+                marginBottom: "6px",
+              }}
+            >
+              {item.file}
+              {item.function
+                ? ` · ${item.function}()`
+                : ""}
+            </div>
+
+            {/* REASON */}
+            <div
+              style={{
+                color: "#d1d5db",
+                fontSize: "11px",
+                lineHeight: 1.55,
+                marginBottom:
+                  item.predicted_effects ||
+                  item.recommended_checks
+                    ? "12px"
+                    : "0",
+              }}
+            >
+              {item.reason}
+            </div>
+
+            {/* PREDICTED EFFECTS */}
+            {item.predicted_effects &&
+              item.predicted_effects.length > 0 && (
+                <div
+                  style={{
+                    marginTop: "10px",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    background: "#0d0f14",
+                    border: "1px solid #1d2028",
+                  }}
+                >
+                  <div
+                    style={{
+                      color: "#fbbf24",
+                      fontSize: "9px",
+                      fontWeight: 800,
+                      letterSpacing: "0.8px",
+                      marginBottom: "7px",
+                    }}
+                  >
+                    PREDICTED EFFECTS
+                  </div>
+
+                  {item.predicted_effects.map(
+                    (effect, effectIndex) => (
+                      <div
+                        key={effectIndex}
+                        style={{
+                          color: "#cbd5e1",
+                          fontSize: "10px",
+                          lineHeight: 1.5,
+                          marginBottom:
+                            effectIndex ===
+                            item.predicted_effects.length - 1
+                              ? "0"
+                              : "4px",
+                        }}
+                      >
+                        • {effect}
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+
+            {/* RECOMMENDED CHECKS */}
+            {item.recommended_checks &&
+              item.recommended_checks.length > 0 && (
+                <div
+                  style={{
+                    marginTop: "8px",
+                    padding: "10px",
+                    borderRadius: "8px",
+                    background: "#0d0f14",
+                    border: "1px solid #1d2028",
+                  }}
+                >
+                  <div
+                    style={{
+                      color: "#86efac",
+                      fontSize: "9px",
+                      fontWeight: 800,
+                      letterSpacing: "0.8px",
+                      marginBottom: "7px",
+                    }}
+                  >
+                    RECOMMENDED CHECKS
+                  </div>
+
+                  {item.recommended_checks.map(
+                    (check, checkIndex) => (
+                      <div
+                        key={checkIndex}
+                        style={{
+                          color: "#cbd5e1",
+                          fontSize: "10px",
+                          lineHeight: 1.5,
+                          marginBottom:
+                            checkIndex ===
+                            item.recommended_checks.length - 1
+                              ? "0"
+                              : "4px",
+                        }}
+                      >
+                        ✓ {check}
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function Metric({ label, value }) {
   return (
@@ -628,14 +1092,712 @@ function Metric({ label, value }) {
   );
 }
 
+function FeatureImpact({
+  featureImpact,
+  repositoryFeatureMap,
+}) {
+  if (!featureImpact || featureImpact.length === 0) {
+    return null;
+  }
+
+  return (
+    <section style={styles.subsection}>
+      <h3 style={styles.sectionTitle}>
+        Feature Impact
+      </h3>
+
+      <div
+        style={{
+          padding: "14px",
+          borderRadius: "10px",
+          background: "#0b0c10",
+          border: "1px solid #20222a",
+        }}
+      >
+        <div
+          style={{
+            color: "#60a5fa",
+            fontSize: "10px",
+            fontWeight: 800,
+            letterSpacing: "1px",
+            marginBottom: "12px",
+          }}
+        >
+          POTENTIALLY AFFECTED FEATURES
+        </div>
+
+        {featureImpact.map((impact, index) => (
+          <div
+            key={index}
+            style={{
+              padding: "12px",
+              marginBottom:
+                index === featureImpact.length - 1
+                  ? "0"
+                  : "8px",
+              borderRadius: "8px",
+              background: "#111218",
+              border: "1px solid #1d2028",
+            }}
+          >
+            <div
+              style={{
+                color: "#e5e7eb",
+                fontSize: "12px",
+                fontWeight: 800,
+              }}
+            >
+              {impact.feature}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                marginTop: "8px",
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{
+                  padding: "4px 7px",
+                  borderRadius: "5px",
+                  background: "#171922",
+                  color: "#fbbf24",
+                  fontSize: "9px",
+                  fontWeight: 800,
+                  letterSpacing: "0.5px",
+                }}
+              >
+                {impact.impact_level}
+              </span>
+
+              <span
+                style={{
+                  padding: "4px 7px",
+                  borderRadius: "5px",
+                  background: "#171922",
+                  color: "#a78bfa",
+                  fontSize: "9px",
+                  fontWeight: 800,
+                  letterSpacing: "0.5px",
+                }}
+              >
+                {impact.confidence}
+              </span>
+            </div>
+
+            <div
+              style={{
+                color: "#9ca3af",
+                fontSize: "10px",
+                lineHeight: 1.5,
+                marginTop: "10px",
+              }}
+            >
+              {impact.predicted_effect}
+            </div>
+
+            <div
+              style={{
+                color: "#6b7280",
+                fontSize: "10px",
+                lineHeight: 1.5,
+                marginTop: "8px",
+              }}
+            >
+              {impact.relationship}
+            </div>
+
+            <div
+              style={{
+                color: "#6b7280",
+                fontSize: "9px",
+                lineHeight: 1.5,
+                marginTop: "8px",
+              }}
+            >
+              Evidence: {impact.evidence}
+            </div>
+
+            {repositoryFeatureMap?.map((mapping, mappingIndex) => (
+  <div
+    key={mappingIndex}
+    style={{
+      marginTop: "10px",
+      padding: "10px",
+      borderRadius: "7px",
+      background: "#0d1016",
+      border: "1px solid #252a35",
+    }}
+  >
+    <div
+      style={{
+        color: "#60a5fa",
+        fontSize: "9px",
+        fontWeight: 800,
+        letterSpacing: "0.7px",
+        marginBottom: "7px",
+      }}
+    >
+      REPOSITORY-GROUNDED RELATIONSHIP
+    </div>
+
+    <div
+      style={{
+        color: "#d1d5db",
+        fontSize: "10px",
+        lineHeight: 1.5,
+      }}
+    >
+      {mapping.changed_component?.function}()
+      {" → "}
+      {mapping.dependent_component?.function}()
+    </div>
+
+    <div
+      style={{
+        color: "#9ca3af",
+        fontSize: "9px",
+        lineHeight: 1.5,
+        marginTop: "6px",
+      }}
+    >
+      {mapping.basis}
+    </div>
+
+    <div
+      style={{
+        color: "#6b7280",
+        fontSize: "9px",
+        marginTop: "6px",
+      }}
+    >
+      Repository grounded:{" "}
+      {mapping.repository_grounded ? "YES" : "NO"}
+    </div>
+  </div>
+))}
+
+            <div
+              style={{
+                marginTop: "10px",
+              }}
+            >
+              <div
+                style={{
+                  color: "#d1d5db",
+                  fontSize: "9px",
+                  fontWeight: 800,
+                  letterSpacing: "0.7px",
+                  marginBottom: "5px",
+                }}
+              >
+                RECOMMENDED CHECKS
+              </div>
+
+              {impact.recommended_checks?.map(
+                (check, checkIndex) => (
+                  <div
+                    key={checkIndex}
+                    style={{
+                      color: "#9ca3af",
+                      fontSize: "9px",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    ✓ {check}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TestImpact({ testImpact }) {
+  if (!testImpact || testImpact.length === 0) {
+    return null;
+  }
+
+  return (
+    <section style={styles.subsection}>
+      <h3 style={styles.sectionTitle}>
+        Test Impact
+      </h3>
+
+      <div
+        style={{
+          padding: "14px",
+          borderRadius: "10px",
+          background: "#0b0c10",
+          border: "1px solid #20222a",
+        }}
+      >
+        <div
+          style={{
+            color: "#fbbf24",
+            fontSize: "10px",
+            fontWeight: 800,
+            letterSpacing: "1px",
+            marginBottom: "10px",
+          }}
+        >
+          TESTS THAT SHOULD BE REVIEWED
+        </div>
+
+        <div
+          style={{
+            color: "#9ca3af",
+            fontSize: "10px",
+            marginBottom: "10px",
+          }}
+        >
+          {testImpact.length} test
+          {testImpact.length === 1 ? "" : "s"} potentially affected
+          by this change.
+        </div>
+
+        {testImpact.map((testFile, index) => (
+          <div
+            key={index}
+            style={{
+              padding: "10px",
+              marginBottom:
+                index === testImpact.length - 1
+                  ? "0"
+                  : "7px",
+              borderRadius: "8px",
+              background: "#111218",
+              border: "1px solid #1d2028",
+            }}
+          >
+            <div
+              style={{
+                color: "#e5e7eb",
+                fontSize: "11px",
+                fontWeight: 800,
+              }}
+            >
+              {testFile}
+            </div>
+
+            <div
+              style={{
+                color: "#9ca3af",
+                fontSize: "10px",
+                lineHeight: 1.5,
+                marginTop: "5px",
+              }}
+            >
+              This test directly depends on the changed
+              component and should be reviewed or run after
+              applying the proposed change.
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ChangeImpactSummary({
+  simulation,
+  semanticChange,
+  direct,
+  indirect,
+  breakage,
+}) {
+  const changedFunction =
+    simulation.changed_function || null;
+
+  const changedFile =
+    simulation.changed_file || "Unknown";
+
+  const impactCount =
+    simulation.impact_count ?? 0;
+
+  const riskAreas = [];
+
+  if (changedFunction) {
+    riskAreas.push(`${changedFunction}()`);
+  }
+
+  if (semanticChange?.category === "BEHAVIORAL") {
+    riskAreas.push("Changed feature behavior");
+  }
+
+  if (
+    semanticChange?.category === "RETURN_CONTRACT"
+  ) {
+    riskAreas.push("Return value compatibility");
+  }
+
+  if (
+    semanticChange?.category === "INPUT_CONTRACT"
+  ) {
+    riskAreas.push("Input/parameter compatibility");
+  }
+
+  if (
+    semanticChange?.category === "API_COMPATIBILITY"
+  ) {
+    riskAreas.push("API compatibility");
+  }
+
+  if (
+    semanticChange?.category === "DATA_FLOW"
+  ) {
+    riskAreas.push("Data flow / data structure");
+  }
+
+  if (
+    semanticChange?.category === "STRUCTURAL"
+  ) {
+    riskAreas.push("Project structure / references");
+  }
+
+  if (breakage && breakage.length > 0) {
+    riskAreas.push("Related tests and dependent code");
+  }
+
+  return (
+    <section style={styles.subsection}>
+      <h3 style={styles.sectionTitle}>
+        Change Impact Summary
+      </h3>
+
+      <div
+        style={{
+          padding: "14px",
+          borderRadius: "10px",
+          background: "#0b0c10",
+          border: "1px solid #20222a",
+        }}
+      >
+        {/* TARGET */}
+        <div style={{ marginBottom: "14px" }}>
+          <div
+            style={{
+              color: "#fbbf24",
+              fontSize: "9px",
+              fontWeight: 800,
+              letterSpacing: "1px",
+              marginBottom: "6px",
+            }}
+          >
+            TARGET
+          </div>
+
+          <div
+            style={{
+              color: "#e5e7eb",
+              fontSize: "12px",
+              fontWeight: 800,
+            }}
+          >
+            {changedFunction
+              ? `${changedFunction}()`
+              : changedFile}
+          </div>
+
+          {changedFunction && (
+            <div
+              style={{
+                color: "#9ca3af",
+                fontSize: "10px",
+                marginTop: "4px",
+              }}
+            >
+              {changedFile}
+            </div>
+          )}
+        </div>
+
+        {/* METRICS */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns:
+              "repeat(3, minmax(0, 1fr))",
+            gap: "8px",
+            marginBottom: "14px",
+          }}
+        >
+          <div
+            style={{
+              padding: "10px",
+              borderRadius: "8px",
+              background: "#111218",
+              border: "1px solid #1d2028",
+            }}
+          >
+            <div
+              style={{
+                color: "#9ca3af",
+                fontSize: "8px",
+                fontWeight: 800,
+                letterSpacing: "0.8px",
+              }}
+            >
+              IMPACTED
+            </div>
+
+            <div
+              style={{
+                color: "#e5e7eb",
+                fontSize: "18px",
+                fontWeight: 800,
+                marginTop: "4px",
+              }}
+            >
+              {impactCount}
+            </div>
+
+            <div
+              style={{
+                color: "#6b7280",
+                fontSize: "8px",
+              }}
+            >
+              files
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: "10px",
+              borderRadius: "8px",
+              background: "#111218",
+              border: "1px solid #1d2028",
+            }}
+          >
+            <div
+              style={{
+                color: "#9ca3af",
+                fontSize: "8px",
+                fontWeight: 800,
+                letterSpacing: "0.8px",
+              }}
+            >
+              DIRECT
+            </div>
+
+            <div
+              style={{
+                color: "#86efac",
+                fontSize: "18px",
+                fontWeight: 800,
+                marginTop: "4px",
+              }}
+            >
+              {direct.length}
+            </div>
+
+            <div
+              style={{
+                color: "#6b7280",
+                fontSize: "8px",
+              }}
+            >
+              dependencies
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: "10px",
+              borderRadius: "8px",
+              background: "#111218",
+              border: "1px solid #1d2028",
+            }}
+          >
+            <div
+              style={{
+                color: "#9ca3af",
+                fontSize: "8px",
+                fontWeight: 800,
+                letterSpacing: "0.8px",
+              }}
+            >
+              INDIRECT
+            </div>
+
+            <div
+              style={{
+                color: "#fcd34d",
+                fontSize: "18px",
+                fontWeight: 800,
+                marginTop: "4px",
+              }}
+            >
+              {indirect.length}
+            </div>
+
+            <div
+              style={{
+                color: "#6b7280",
+                fontSize: "8px",
+              }}
+            >
+              dependencies
+            </div>
+          </div>
+        </div>
+
+        {/* CHANGE NATURE */}
+        {semanticChange && (
+          <div
+            style={{
+              marginBottom: "14px",
+              padding: "10px",
+              borderRadius: "8px",
+              background: "#111218",
+              border: "1px solid #1d2028",
+            }}
+          >
+            <div
+              style={{
+                color: "#9ca3af",
+                fontSize: "8px",
+                fontWeight: 800,
+                letterSpacing: "0.8px",
+                marginBottom: "6px",
+              }}
+            >
+              CHANGE NATURE
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <div
+                style={{
+                  color: "#e5e7eb",
+                  fontSize: "11px",
+                  fontWeight: 800,
+                }}
+              >
+                {semanticChange.category}
+              </div>
+
+              <div
+                style={{
+                  color:
+                    semanticChange.confidence === "HIGH"
+                      ? "#86efac"
+                      : semanticChange.confidence === "MEDIUM"
+                      ? "#fcd34d"
+                      : "#fca5a5",
+                  fontSize: "8px",
+                  fontWeight: 800,
+                }}
+              >
+                {semanticChange.confidence}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* RISK AREAS */}
+        {riskAreas.length > 0 && (
+          <div
+            style={{
+              marginBottom: "14px",
+            }}
+          >
+            <div
+              style={{
+                color: "#fbbf24",
+                fontSize: "9px",
+                fontWeight: 800,
+                letterSpacing: "1px",
+                marginBottom: "7px",
+              }}
+            >
+              RISK AREAS
+            </div>
+
+            {riskAreas.map((risk, index) => (
+              <div
+                key={index}
+                style={{
+                  color: "#cbd5e1",
+                  fontSize: "10px",
+                  lineHeight: 1.5,
+                  marginBottom:
+                    index === riskAreas.length - 1
+                      ? "0"
+                      : "4px",
+                }}
+              >
+                • {risk}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* REPOSITORY STATUS */}
+        <div
+          style={{
+            paddingTop: "10px",
+            borderTop: "1px solid #1d2028",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div
+            style={{
+              color: "#9ca3af",
+              fontSize: "9px",
+              fontWeight: 800,
+              letterSpacing: "0.8px",
+            }}
+          >
+            REPOSITORY MODIFIED
+          </div>
+
+          <div
+            style={{
+              color: "#86efac",
+              fontSize: "9px",
+              fontWeight: 800,
+            }}
+          >
+            NO
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function Results({
   result,
   onBack,
   onNew,
 }) {
   const simulation = result.simulation || {};
+
+  const dependencyImpact =
+    simulation.dependency_impact || null;
+
+  const consequences =
+    simulation.consequences || [];
+
+  const semanticChange =
+    simulation.semantic_change || null;
+
   console.log("PROJECTTWIN SIMULATION:", simulation);
-  
+
   const direct =
     simulation.direct_dependencies || [];
 
@@ -657,6 +1819,15 @@ function Results({
   const breakage =
     simulation.possible_breakage || [];
 
+  const testImpact =
+    simulation.test_impact || [];
+
+  const featureImpact =
+    simulation.feature_impact || [];
+
+  const repositoryFeatureMap =
+    simulation.repository_feature_map || [];
+  
   return (
     <div>
       <div style={styles.resultActions}>
@@ -718,6 +1889,14 @@ function Results({
           </span>
         </div>
 
+        <ChangeImpactSummary
+          simulation={simulation}
+          semanticChange={semanticChange}
+          direct={direct}
+          indirect={indirect}
+          breakage={breakage}
+        />
+
         <ImpactList
           title="Predicted Removed"
           items={removed}
@@ -746,6 +1925,97 @@ function Results({
           title="Indirect Dependencies"
           items={indirect}
           empty="No indirect dependencies detected."
+        />
+
+        <ImpactEvidence
+          dependencyImpact={dependencyImpact}
+        />
+
+        {semanticChange && (
+  <section style={styles.subsection}>
+    <h3 style={styles.sectionTitle}>
+      Change Nature
+    </h3>
+
+    <div
+      style={{
+        padding: "14px",
+        borderRadius: "10px",
+        background: "#0b0c10",
+        border: "1px solid #20222a",
+      }}
+    >
+      <div
+        style={{
+          color: "#fbbf24",
+          fontSize: "10px",
+          fontWeight: 800,
+          letterSpacing: "1px",
+          marginBottom: "10px",
+        }}
+      >
+        SEMANTIC CHANGE ANALYSIS
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          marginBottom: "10px",
+        }}
+      >
+        <div
+          style={{
+            color: "#e5e7eb",
+            fontSize: "13px",
+            fontWeight: 800,
+          }}
+        >
+          {semanticChange.category}
+        </div>
+
+        <div
+          style={{
+            color:
+              semanticChange.confidence === "HIGH"
+                ? "#86efac"
+                : semanticChange.confidence === "MEDIUM"
+                ? "#fcd34d"
+                : "#fca5a5",
+            fontSize: "9px",
+            fontWeight: 800,
+            letterSpacing: "0.8px",
+          }}
+        >
+          {semanticChange.confidence} CONFIDENCE
+        </div>
+      </div>
+
+      <div
+        style={{
+          color: "#9ca3af",
+          fontSize: "11px",
+          lineHeight: 1.55,
+        }}
+      >
+        {semanticChange.evidence}
+      </div>
+    </div>
+  </section>
+)}
+
+        <ConsequencePrediction
+          consequences={consequences}
+        />
+
+        <FeatureImpact
+          featureImpact={featureImpact}
+          repositoryFeatureMap={repositoryFeatureMap}
+        />
+
+        <TestImpact
+          testImpact={testImpact}
         />
 
         <section style={styles.subsection}>

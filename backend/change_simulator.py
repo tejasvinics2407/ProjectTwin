@@ -1,6 +1,8 @@
 from backend.impact_analyzer import find_impact
 from backend.dependency_impact import analyze_dependency_impact
-
+from backend.change_classifier import classify_semantic_change
+from backend.feature_impact import build_feature_impact
+from backend.feature_mapper import build_repository_feature_map
 
 def classify_change(change_description):
 
@@ -194,43 +196,43 @@ def find_function_affected_files(
         affected_files
     )
 
-
 def find_test_impact(
     graph,
     changed_file
 ):
-
     """
-    Find test files that directly depend
-    on the changed file.
+    Find test files that directly depend on the changed file.
+
+    Returns:
+        A sorted list of test file paths.
     """
 
     test_files = []
 
-    direct_dependencies = (
-        find_direct_dependencies(
-            graph,
-            changed_file
-        )
+    direct_dependencies = find_direct_dependencies(
+        graph,
+        changed_file
     )
 
     for file in direct_dependencies:
 
-        normalized = file.replace(
-            "\\",
-            "/"
-        ).lower()
+        normalized = (
+            file
+            .replace("\\", "/")
+            .lower()
+        )
 
-        if (
+        is_test_file = (
             normalized.startswith("tests/")
             or "/tests/" in normalized
             or normalized.startswith("test_")
             or "/test_" in normalized
-        ):
+            or normalized.endswith("_test.py")
+            or "/test/" in normalized
+        )
 
-            test_files.append(
-                file
-            )
+        if is_test_file:
+            test_files.append(file)
 
     return sorted(
         set(test_files)
@@ -304,21 +306,28 @@ def build_function_breakage(
 
     return possible_breakage
 
-
 def build_consequence_analysis(
     function_impact,
     change_type,
     change_description
 ):
-
     """
-    Generate structured consequence predictions
-    from dependency and data-flow evidence.
+    Generate specific consequence predictions
+    using dependency evidence and semantic change type.
 
     These are predictions, not guarantees.
     """
 
     consequences = []
+
+    semantic_change = classify_semantic_change(
+        change_description
+    )
+
+    semantic_category = semantic_change.get(
+        "category",
+        "UNKNOWN"
+    )
 
     for relationship in function_impact:
 
@@ -334,99 +343,268 @@ def build_consequence_analysis(
             "changed_function"
         ]
 
-        assigned_to = relationship.get(
-            "assigned_to"
-        )
+        # ---------------------------------------------------------
+        # MODIFY
+        # ---------------------------------------------------------
 
         if change_type == "MODIFY":
 
-            if assigned_to:
+            # RETURN CONTRACT
+            if semantic_category == "RETURN_CONTRACT":
+
+                consequences.append(
+                    {
+                        "type": "RETURN_CONTRACT",
+                        "severity": "POTENTIAL",
+                        "file": dependent_file,
+                        "function": dependent_function,
+
+                        "reason": (
+                            f"{changed_function}() is proposed to "
+                            f"change its returned value, type, or "
+                            f"structure. {dependent_function}() "
+                            f"depends on that result and may need "
+                            f"compatibility changes."
+                        ),
+
+                        "predicted_effects": [
+                            "Caller may receive a different result format",
+                            "Existing result handling may need modification",
+                            "Downstream logic may behave differently",
+                        ],
+
+                        "recommended_checks": [
+                            f"{dependent_function}()",
+                            "Code that consumes the returned value",
+                            "Related unit and integration tests",
+                        ],
+                    }
+                )
+
+            # INPUT CONTRACT
+            elif semantic_category == "INPUT_CONTRACT":
+
+                consequences.append(
+                    {
+                        "type": "INPUT_CONTRACT",
+                        "severity": "POTENTIAL",
+                        "file": dependent_file,
+                        "function": dependent_function,
+
+                        "reason": (
+                            f"{changed_function}() is proposed to "
+                            f"change its parameters or inputs. "
+                            f"{dependent_function}() calls this function "
+                            f"and may need its invocation updated."
+                        ),
+
+                        "predicted_effects": [
+                            "Existing callers may pass incompatible arguments",
+                            "Function calls may require updated parameters",
+                            "Input validation may need to change",
+                        ],
+
+                        "recommended_checks": [
+                            f"{dependent_function}()",
+                            f"All calls to {changed_function}()",
+                            "Tests covering the changed inputs",
+                        ],
+                    }
+                )
+
+            # API COMPATIBILITY
+            elif semantic_category == "API_COMPATIBILITY":
+
+                consequences.append(
+                    {
+                        "type": "API_COMPATIBILITY",
+                        "severity": "POTENTIAL",
+                        "file": dependent_file,
+                        "function": dependent_function,
+
+                        "reason": (
+                            f"{changed_function}() is involved in an "
+                            f"API or endpoint change. {dependent_function}() "
+                            f"may receive a different request or response "
+                            f"contract."
+                        ),
+
+                        "predicted_effects": [
+                            "API request or response structure may change",
+                            "Consumers may need compatibility updates",
+                            "Existing integrations may require review",
+                        ],
+
+                        "recommended_checks": [
+                            "API request format",
+                            "API response format",
+                            f"{dependent_function}()",
+                            "API and integration tests",
+                        ],
+                    }
+                )
+
+            # DATA FLOW
+            elif semantic_category == "DATA_FLOW":
 
                 consequences.append(
                     {
                         "type": "DATA_FLOW",
-
                         "severity": "POTENTIAL",
-
                         "file": dependent_file,
-
                         "function": dependent_function,
 
                         "reason": (
-                            f"{dependent_function}() receives "
-                            f"the result of {changed_function}() "
-                            f"through '{assigned_to}'. "
-                            f"Changing the result structure or "
-                            f"meaning may affect downstream logic."
-                        )
+                            f"{changed_function}() is proposed to "
+                            f"change data flow, storage, schema, or "
+                            f"data structure. {dependent_function}() "
+                            f"may receive different information."
+                        ),
+
+                        "predicted_effects": [
+                            "Data received by the caller may change",
+                            "Fields or structures may become incompatible",
+                            "Downstream calculations may produce different results",
+                        ],
+
+                        "recommended_checks": [
+                            "Data structure consumed by the caller",
+                            "Database or schema usage",
+                            f"{dependent_function}()",
+                            "Data-related tests",
+                        ],
                     }
                 )
 
+            # STRUCTURAL
+            elif semantic_category == "STRUCTURAL":
+
+                consequences.append(
+                    {
+                        "type": "STRUCTURAL",
+                        "severity": "POTENTIAL",
+                        "file": dependent_file,
+                        "function": dependent_function,
+
+                        "reason": (
+                            f"{changed_function}() is being "
+                            f"structurally changed. {dependent_function}() "
+                            f"may require updated references or integration."
+                        ),
+
+                        "predicted_effects": [
+                            "Existing references may become invalid",
+                            "Imports or function calls may need updates",
+                            "Project structure may require integration changes",
+                        ],
+
+                        "recommended_checks": [
+                            f"References to {changed_function}()",
+                            f"{dependent_function}()",
+                            "Imports and module references",
+                            "Related tests",
+                        ],
+                    }
+                )
+
+            # BEHAVIORAL
             else:
 
                 consequences.append(
                     {
                         "type": "BEHAVIOR",
-
                         "severity": "POTENTIAL",
-
                         "file": dependent_file,
-
                         "function": dependent_function,
 
                         "reason": (
-                            f"{dependent_function}() directly "
-                            f"depends on {changed_function}(). "
-                            f"Changes to its behavior may affect "
-                            f"the caller."
-                        )
+                            f"{changed_function}() is proposed to "
+                            f"change its logic or behavior. "
+                            f"{dependent_function}() may therefore "
+                            f"receive different results or behavior."
+                        ),
+
+                        "predicted_effects": [
+                            f"{changed_function}() may produce different results",
+                            f"{dependent_function}() may receive different output",
+                            "Overall feature behavior may change",
+                        ],
+
+                        "recommended_checks": [
+                            f"{changed_function}()",
+                            f"{dependent_function}()",
+                            "Tests covering the changed behavior",
+                        ],
                     }
                 )
+
+        # ---------------------------------------------------------
+        # REMOVE
+        # ---------------------------------------------------------
 
         elif change_type == "REMOVE":
 
             consequences.append(
                 {
                     "type": "BREAKAGE",
-
                     "severity": "HIGH",
-
                     "file": dependent_file,
-
                     "function": dependent_function,
 
                     "reason": (
-                        f"{dependent_function}() calls the "
-                        f"function {changed_function}(). "
-                        f"Removing it may leave this caller "
-                        f"without the required function."
-                    )
+                        f"{dependent_function}() directly calls "
+                        f"{changed_function}(). Removing the function "
+                        f"may leave this caller without a required dependency."
+                    ),
+
+                    "predicted_effects": [
+                        f"{dependent_function}() may fail when calling the removed function",
+                        "Runtime errors may occur",
+                        "Dependent functionality may stop working",
+                    ],
+
+                    "recommended_checks": [
+                        f"Remove or replace the call in {dependent_function}()",
+                        "All references to the removed function",
+                        "Tests covering the dependent functionality",
+                    ],
                 }
             )
+
+        # ---------------------------------------------------------
+        # ADD
+        # ---------------------------------------------------------
 
         elif change_type == "ADD":
 
             consequences.append(
                 {
                     "type": "BEHAVIOR",
-
                     "severity": "POTENTIAL",
-
                     "file": dependent_file,
-
                     "function": dependent_function,
 
                     "reason": (
-                        f"{changed_function}() is being extended "
-                        f"or introduced. The caller should be "
-                        f"checked for compatibility with the "
-                        f"new behavior."
-                    )
+                        f"{changed_function}() is being added or "
+                        f"extended. {dependent_function}() should be "
+                        f"checked for compatibility with the new behavior."
+                    ),
+
+                    "predicted_effects": [
+                        "New functionality may become available",
+                        "Existing callers may need integration changes",
+                        "New behavior may require additional tests",
+                    ],
+
+                    "recommended_checks": [
+                        f"{changed_function}()",
+                        f"{dependent_function}()",
+                        "Tests for the new functionality",
+                    ],
                 }
             )
 
     return consequences
-
 
 def predict_change(
     graph,
@@ -451,6 +629,10 @@ def predict_change(
         function_dependencies = []
 
     change_type = classify_change(
+        change_description
+    )
+
+    semantic_change = classify_semantic_change(
         change_description
     )
 
@@ -657,6 +839,18 @@ def predict_change(
             )
         )
 
+        feature_impact = build_feature_impact(
+            function_impact,
+            changed_file,
+            changed_function,
+            change_type,
+            change_description
+        )
+
+        repository_feature_map = build_repository_feature_map(
+            function_impact
+        )
+
         return {
             "changed_file": changed_file,
 
@@ -666,6 +860,8 @@ def predict_change(
 
             "change_type": change_type,
 
+            "semantic_change": semantic_change,
+            
             "impact_count": len(
                 set(affected_files)
                 | {changed_file}
@@ -686,6 +882,10 @@ def predict_change(
             "test_impact": test_files,
 
             "consequences": consequences,
+
+            "feature_impact": feature_impact,
+
+            "repository_feature_map": repository_feature_map,
 
             "removed": sorted(
                 set(removed)
@@ -886,6 +1086,8 @@ def predict_change(
         "change_description": change_description,
 
         "change_type": change_type,
+
+        "semantic_change": semantic_change,
 
         "impact_count": len(
             set(affected_files)

@@ -10,6 +10,7 @@ from backend.github_ingestion import clone_repository
 from backend.main import analyze_project
 
 from backend.change_simulator import predict_change
+from backend.dependency_impact import analyze_dependency_impact
 from backend.impact_report import generate_impact_report
 from backend.impact_rag import build_impact_prompt
 from backend.llm import ask_gemini
@@ -333,6 +334,12 @@ def simulate_change(request: SimulationRequest):
         dependency_model
     )
 
+    if dependency_model is not None:
+        simulation["dependency_impact"] = analyze_dependency_impact(
+            dependency_model,
+            changed_file,
+            changed_function
+    )
     # -----------------------------------------------------
     # Generate evidence report
     # -----------------------------------------------------
