@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment / secrets
+.env
+.env.*
+
+# Databases
+*.db
+
+# VS Code
+.vscode/
+
+# Generated ProjectTwin data
+data/repos/
+data/chroma_db/
+data/knowledge_base.json
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
+Thumbs.db
