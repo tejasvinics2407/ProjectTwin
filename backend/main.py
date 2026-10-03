@@ -2,7 +2,12 @@ from pathlib import Path
 
 from backend.project_scanner import scan_project
 from backend.github_ingestion import clone_repository
+
 from backend.code_parser import parse_python_file
+
+from backend.parser_manager import parse_file
+
+from backend.project_model import ProjectModel
 
 from backend.dependency_analyzer import (
     build_dependencies,
@@ -23,19 +28,36 @@ def normalize_path(path):
     Convert Windows paths to a consistent
     repository-relative POSIX path.
     """
-    return str(path).replace("\\", "/").strip("/")
+
+    return str(path).replace(
+        "\\",
+        "/"
+    ).strip("/")
 
 
 def analyze_project(project_path):
 
-    project_root = Path(project_path).resolve()
+    project_root = Path(
+        project_path
+    ).resolve()
 
-    files = scan_project(project_root)
+    files = scan_project(
+        project_root
+    )
 
     print("\n=== ProjectTwin Analysis ===")
-    print(f"Found {len(files)} files")
+
+    print(
+        f"Found {len(files)} files"
+    )
 
     parsed_files = []
+
+    # =====================================================
+    # COMMON PROJECT MODEL
+    # =====================================================
+
+    project_model = ProjectModel()
 
     # =====================================================
     # PARSE PROJECT FILES
@@ -43,53 +65,127 @@ def analyze_project(project_path):
 
     for file_path in files:
 
-        if not file_path.endswith(".py"):
-            continue
+        # -------------------------------------------------
+        # Detect language + select parser automatically
+        # -------------------------------------------------
 
-        # Full path is used ONLY for reading the file.
-        full_path = project_root / file_path
+        full_path = (
+            project_root / file_path
+        )
 
         try:
 
-            result = parse_python_file(
-                str(full_path)
+            project_file = parse_file(
+                str(full_path),
+                normalize_path(
+                    file_path
+                )
             )
 
-            # IMPORTANT:
-            # Store ONLY the repository-relative path
-            # inside the ProjectTwin knowledge graph.
-            result["file"] = normalize_path(
-                file_path
+            # -------------------------------------------------
+            # Unsupported file type
+            # -------------------------------------------------
+
+            if project_file is None:
+
+                continue
+
+            # -------------------------------------------------
+            # Add to common ProjectModel
+            # -------------------------------------------------
+
+            project_model.add_file(
+                project_file
             )
 
-            parsed_files.append(result)
+            print(
+                f"\n📄 {project_file.path}"
+            )
 
-            print(f"\n📄 {result['file']}")
+            print(
+                f"  Language: "
+                f"{project_file.language}"
+            )
 
-            print("  Imports:")
+            print(
+                "  Imports:"
+            )
 
-            for item in result["imports"]:
-                print(f"    - {item}")
+            for item in project_file.imports:
 
-            print("  Functions:")
+                print(
+                    f"    - {item}"
+                )
 
-            for item in result["functions"]:
-                print(f"    - {item}")
+            print(
+                "  Symbols:"
+            )
 
-            print("  Classes:")
+            for symbol in project_file.symbols:
 
-            for item in result["classes"]:
-                print(f"    - {item}")
+                print(
+                    f"    - "
+                    f"{symbol.symbol_type}: "
+                    f"{symbol.name}"
+                )
+
+            # -------------------------------------------------
+            # Existing Python knowledge format
+            # -------------------------------------------------
+
+            if project_file.language == "python":
+
+                python_result = parse_python_file(
+                    str(full_path)
+                )
+
+                python_result["file"] = (
+                    normalize_path(
+                        file_path
+                    )
+                )
+
+                parsed_files.append(
+                    python_result
+                )
 
         except Exception as error:
 
             print(
-                f"  Could not parse {file_path}: "
+                f"  Could not parse "
+                f"{file_path}: "
                 f"{error}"
             )
 
     # =====================================================
-    # SAVE KNOWLEDGE BASE
+    # PROJECT MODEL SUMMARY
+    # =====================================================
+
+    print(
+        "\n=== Project Model ==="
+    )
+
+    model_summary = (
+        project_model.summary()
+    )
+
+    print(
+        f"  Files: "
+        f"{model_summary['file_count']}"
+    )
+
+    print(
+        f"  Symbols: "
+        f"{model_summary['symbol_count']}"
+    )
+
+    print(
+        f"  Languages: "
+        f"{', '.join(model_summary['languages'])}"
+    )
+
+    # =====================================================
+    # SAVE EXISTING KNOWLEDGE BASE
     # =====================================================
 
     save_knowledge_base(
@@ -98,7 +194,7 @@ def analyze_project(project_path):
     )
 
     # =====================================================
-    # BUILD FILE DEPENDENCIES
+    # BUILD EXISTING PYTHON FILE DEPENDENCIES
     # =====================================================
 
     dependencies = build_dependencies(
@@ -106,7 +202,9 @@ def analyze_project(project_path):
         parsed_files
     )
 
-    print("\n=== Dependency Relationships ===")
+    print(
+        "\n=== Dependency Relationships ==="
+    )
 
     if dependencies:
 
@@ -123,26 +221,35 @@ def analyze_project(project_path):
             dependencies
         )
 
-        display_graph(graph)
+        display_graph(
+            graph
+        )
 
     else:
 
         print(
-            "  No internal project dependencies found."
+            "  No internal Python "
+            "project dependencies found."
         )
 
-        graph = create_dependency_graph([])
+        graph = create_dependency_graph(
+            []
+        )
 
     # =====================================================
-    # BUILD FUNCTION DEPENDENCIES
+    # BUILD EXISTING PYTHON FUNCTION DEPENDENCIES
     # =====================================================
 
-    function_dependencies = build_function_dependencies(
-        project_path,
-        parsed_files
+    function_dependencies = (
+        build_function_dependencies(
+            project_path,
+            parsed_files
+        )
     )
 
-    print("\n=== Function Dependencies ===")
+    print(
+        "\n=== Function Dependencies ==="
+    )
 
     if function_dependencies:
 
@@ -160,10 +267,17 @@ def analyze_project(project_path):
     else:
 
         print(
-            "  No function dependencies found."
+            "  No Python function dependencies found."
         )
 
-    return graph, function_dependencies
+    # =====================================================
+    # RETURN EXISTING FORMAT
+    # =====================================================
+
+    return (
+        graph,
+        function_dependencies
+    )
 
 
 if __name__ == "__main__":
@@ -217,6 +331,7 @@ if __name__ == "__main__":
     ).strip()
 
     if not changed_function:
+
         changed_function = None
 
     # =====================================================
@@ -235,7 +350,9 @@ if __name__ == "__main__":
     # DISPLAY RESULT
     # =====================================================
 
-    print("\n=== CHANGE SIMULATION ===")
+    print(
+        "\n=== CHANGE SIMULATION ==="
+    )
 
     print(
         f"\nChanged file: "
@@ -252,23 +369,33 @@ if __name__ == "__main__":
         f"{simulation['impact_count']}"
     )
 
-    print("\nDirect dependencies:")
+    print(
+        "\nDirect dependencies:"
+    )
 
     for file in simulation[
         "direct_dependencies"
     ]:
 
-        print(f"  - {file}")
+        print(
+            f"  - {file}"
+        )
 
-    print("\nIndirect dependencies:")
+    print(
+        "\nIndirect dependencies:"
+    )
 
     for file in simulation[
         "indirect_dependencies"
     ]:
 
-        print(f"  - {file}")
+        print(
+            f"  - {file}"
+        )
 
-    print("\nFunction-level impact:")
+    print(
+        "\nFunction-level impact:"
+    )
 
     for relationship in simulation[
         "function_impact"
@@ -283,25 +410,45 @@ if __name__ == "__main__":
             f"{relationship['changed_function']}()"
         )
 
-    print("\nPredicted removed:")
+    print(
+        "\nPredicted removed:"
+    )
 
-    for file in simulation["removed"]:
+    for file in simulation[
+        "removed"
+    ]:
 
-        print(f"  - {file}")
+        print(
+            f"  - {file}"
+        )
 
-    print("\nPredicted modified:")
+    print(
+        "\nPredicted modified:"
+    )
 
-    for file in simulation["modified"]:
+    for file in simulation[
+        "modified"
+    ]:
 
-        print(f"  - {file}")
+        print(
+            f"  - {file}"
+        )
 
-    print("\nPredicted added:")
+    print(
+        "\nPredicted added:"
+    )
 
-    for file in simulation["added"]:
+    for file in simulation[
+        "added"
+    ]:
 
-        print(f"  - {file}")
+        print(
+            f"  - {file}"
+        )
 
-    print("\nPossible breakage:")
+    print(
+        "\nPossible breakage:"
+    )
 
     for item in simulation[
         "possible_breakage"

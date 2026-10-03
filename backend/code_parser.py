@@ -1,5 +1,10 @@
 import ast
 
+from backend.project_model import (
+    ProjectFile,
+    Symbol
+)
+
 
 def get_called_names(node):
     """
@@ -31,13 +36,13 @@ def get_called_names(node):
 
 def get_function_call_details(node):
     """
-    Capture more information about function calls.
+    Capture information about function calls.
 
     Example:
 
         skill_gap = analyze_skill_gap(...)
 
-    becomes information describing:
+    becomes:
 
         function: analyze_skill_gap
         assigned_to: skill_gap
@@ -69,10 +74,6 @@ def get_function_call_details(node):
 
         assigned_to = None
 
-        parent_assignments = []
-
-        # Search the function body for an assignment
-        # containing this exact Call node.
         for parent in ast.walk(node):
 
             if not isinstance(
@@ -157,9 +158,9 @@ def parse_python_file(file_path):
     functions = []
     classes = []
 
-    # ---------------------------------------------------------
-    # Imports
-    # ---------------------------------------------------------
+    # =========================================================
+    # IMPORTS
+    # =========================================================
 
     for node in ast.walk(tree):
 
@@ -185,9 +186,9 @@ def parse_python_file(file_path):
                     node.module
                 )
 
-    # ---------------------------------------------------------
-    # Functions
-    # ---------------------------------------------------------
+    # =========================================================
+    # FUNCTIONS
+    # =========================================================
 
     for node in ast.walk(tree):
 
@@ -203,9 +204,9 @@ def parse_python_file(file_path):
                 node.name
             )
 
-    # ---------------------------------------------------------
-    # Classes
-    # ---------------------------------------------------------
+    # =========================================================
+    # CLASSES
+    # =========================================================
 
     for node in ast.walk(tree):
 
@@ -218,9 +219,9 @@ def parse_python_file(file_path):
                 node.name
             )
 
-    # ---------------------------------------------------------
-    # Function details
-    # ---------------------------------------------------------
+    # =========================================================
+    # FUNCTION DETAILS
+    # =========================================================
 
     function_details = []
 
@@ -257,9 +258,9 @@ def parse_python_file(file_path):
             }
         )
 
-    # ---------------------------------------------------------
-    # Class details
-    # ---------------------------------------------------------
+    # =========================================================
+    # CLASS DETAILS
+    # =========================================================
 
     class_details = []
 
@@ -297,6 +298,10 @@ def parse_python_file(file_path):
             }
         )
 
+    # =========================================================
+    # EXISTING PROJECTTWIN FORMAT
+    # =========================================================
+
     return {
         "file": file_path,
 
@@ -316,3 +321,219 @@ def parse_python_file(file_path):
 
         "class_details": class_details
     }
+
+
+def parse_python_file_to_model(
+    file_path,
+    project_relative_path=None
+):
+    """
+    Convert a Python source file into the
+    language-independent ProjectTwin model.
+
+    The existing parse_python_file() function
+    remains unchanged in purpose so that the
+    current dependency and impact system keeps
+    working.
+
+    This function creates:
+
+        ProjectFile
+            +
+        Symbol objects
+    """
+
+    with open(
+        file_path,
+        "r",
+        encoding="utf-8"
+    ) as file:
+
+        source_code = file.read()
+
+    tree = ast.parse(
+        source_code
+    )
+
+    if project_relative_path:
+
+        project_path = project_relative_path
+
+    else:
+
+        project_path = file_path
+
+    project_file = ProjectFile(
+        path=str(
+            project_path
+        ).replace(
+            "\\",
+            "/"
+        ),
+
+        language="python"
+    )
+
+    # =========================================================
+    # IMPORTS
+    # =========================================================
+
+    for node in ast.walk(tree):
+
+        if isinstance(
+            node,
+            ast.Import
+        ):
+
+            for name in node.names:
+
+                project_file.imports.append(
+                    name.name
+                )
+
+        elif isinstance(
+            node,
+            ast.ImportFrom
+        ):
+
+            if node.module:
+
+                project_file.imports.append(
+                    node.module
+                )
+
+    project_file.imports = sorted(
+        set(
+            project_file.imports
+        )
+    )
+
+    # =========================================================
+    # FUNCTIONS
+    # =========================================================
+
+    for node in ast.walk(tree):
+
+        if not isinstance(
+            node,
+            (
+                ast.FunctionDef,
+                ast.AsyncFunctionDef
+            )
+        ):
+            continue
+
+        symbol = Symbol(
+            name=node.name,
+
+            symbol_type="function",
+
+            file=project_file.path,
+
+            language="python",
+
+            line_start=node.lineno,
+
+            line_end=getattr(
+                node,
+                "end_lineno",
+                node.lineno
+            ),
+
+            calls=get_called_names(
+                node
+            ),
+
+            imports=[]
+        )
+
+        project_file.symbols.append(
+            symbol
+        )
+
+    # =========================================================
+    # CLASSES
+    # =========================================================
+
+    for node in ast.walk(tree):
+
+        if not isinstance(
+            node,
+            ast.ClassDef
+        ):
+            continue
+
+        class_symbol = Symbol(
+            name=node.name,
+
+            symbol_type="class",
+
+            file=project_file.path,
+
+            language="python",
+
+            line_start=node.lineno,
+
+            line_end=getattr(
+                node,
+                "end_lineno",
+                node.lineno
+            ),
+
+            calls=get_called_names(
+                node
+            ),
+
+            imports=[]
+        )
+
+        project_file.symbols.append(
+            class_symbol
+        )
+
+        # -----------------------------------------------------
+        # Class methods
+        # -----------------------------------------------------
+
+        for child in node.body:
+
+            if not isinstance(
+                child,
+                (
+                    ast.FunctionDef,
+                    ast.AsyncFunctionDef
+                )
+            ):
+                continue
+
+            method_symbol = Symbol(
+                name=child.name,
+
+                symbol_type="method",
+
+                file=project_file.path,
+
+                language="python",
+
+                line_start=child.lineno,
+
+                line_end=getattr(
+                    child,
+                    "end_lineno",
+                    child.lineno
+                ),
+
+                parent=node.name,
+
+                calls=get_called_names(
+                    child
+                ),
+
+                imports=[]
+            )
+
+            project_file.symbols.append(
+                method_symbol
+            )
+
+    return project_file
